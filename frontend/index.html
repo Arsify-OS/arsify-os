@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArsifyOS — Browser MVP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8f8f6;
+      color: #1a1a18;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: #5f5e5a; font-size: 0.9rem; margin-bottom: 2rem; }
+    .card {
+      background: #fff;
+      border: 1px solid #e0ded8;
+      border-radius: 10px;
+      padding: 1.5rem;
+      max-width: 760px;
+      margin: 0 auto 1.5rem;
+    }
+    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.75rem;
+      border: 1px solid #d3d1c7;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+      background: #fafaf8;
+    }
+    textarea:focus { outline: 2px solid #7f77dd; border-color: transparent; }
+    .hint { font-size: 0.78rem; color: #888780; margin-top: 0.4rem; }
+    button {
+      margin-top: 1rem;
+      padding: 0.6rem 1.4rem;
+      background: #534ab7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:disabled { background: #b4b2a9; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #3c3489; }
+    /* ── Compiler section ──────────────────────────────────────────────────── */
+    #compiler-card {
+      display: none;
+      background: #fff;
+      border: 2px solid #2a7d4f;
+      border-radius: 10px;
+      padding: 1.5rem;
+      max-width: 760px;
+      margin: 1.5rem auto 0;
+    }
+    #compiler-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; color: #1a1a18; }
+    #compiler-card p  { font-size: 0.875rem; color: #5f5e5a; margin-bottom: 1rem; }
+    #generate-btn {
+      background: #2a7d4f;
+      padding: 0.6rem 1.6rem;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+    }
+    #generate-btn:disabled { background: #b4b2a9; cursor: not-allowed; }
+    #generate-btn:hover:not(:disabled) { background: #1d5c38; }
+    #compiler-status {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #3c3489;
+      display: none;
+    }
+    #download-banner {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      background: #e1f5ee;
+      border: 1px solid #5dcaa5;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #085041;
+    }
+    #download-banner a {
+      font-weight: 700;
+      color: #085041;
+      text-decoration: underline;
+    }
+    #download-banner .dl-meta {
+      font-size: 0.78rem;
+      color: #2a7d4f;
+      margin-top: 0.3rem;
+    }
+
+    /* Status bar */
+    #status-bar {
+      display: none;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-top: 1rem;
+    }
+    #status-bar.running { background: #eeedfe; color: #3c3489; border: 1px solid #afa9ec; }
+    #status-bar.complete { background: #e1f5ee; color: #085041; border: 1px solid #5dcaa5; }
+    #status-bar.error { background: #fcebeb; color: #791f1f; border: 1px solid #f09595; }
+
+    /* Step progress */
+    .steps { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .step {
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      background: #f1efe8;
+      color: #5f5e5a;
+      border: 1px solid #d3d1c7;
+    }
+    .step.active { background: #eeedfe; color: #3c3489; border-color: #afa9ec; font-weight: 500; }
+    .step.done { background: #e1f5ee; color: #085041; border-color: #5dcaa5; }
+
+    /* Tabs */
+    .tabs { display: none; margin-top: 1.5rem; }
+    .tab-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab-btn {
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      border: 1px solid #d3d1c7;
+      background: #f8f8f6;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .tab-btn.active { background: #534ab7; color: #fff; border-color: #534ab7; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    pre {
+      background: #f1efe8;
+      border: 1px solid #d3d1c7;
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-height: 480px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .score-badge {
+      display: inline-block;
+      padding: 0.2rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+    .score-high   { background: #e1f5ee; color: #085041; }
+    .score-medium { background: #faeeda; color: #633806; }
+    .score-low    { background: #fcebeb; color: #791f1f; }
+    .copy-btn {
+      float: right;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.78rem;
+      margin-top: 0;
+      background: #f1efe8;
+      color: #3d3d3a;
+      border: 1px solid #d3d1c7;
+    }
+    .copy-btn:hover { background: #d3d1c7; }
+
+    /* Config row */
+    .config-row {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .config-row > div { flex: 1; min-width: 180px; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #d3d1c7;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      background: #fafaf8;
+    }
+    input:focus { outline: 2px solid #7f77dd; border-color: transparent; }
+
+    /* Phase C: live deployment banner */
+    #live-card {
+      display: none;
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      border: 1px solid #66bb6a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 760px;
+      margin: 0 auto 1.5rem;
+      text-align: center;
+    }
+    #live-card h2 { color: #1b5e20; margin-bottom: 0.5rem; font-size: 1.5rem; }
+    #live-card .live-url {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.6rem 1.2rem;
+      background: #2e7d32;
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+    #live-card .live-url:hover { background: #1b5e20; }
+    #live-card .live-meta { font-size: 0.8rem; color: #2e5e2e; margin-top: 0.6rem; font-family: monospace; }
+    #deploy-status {
+      display: none;
+      background: #fff8e1;
+      border: 1px solid #ffb300;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin: 0.75rem 0;
+      font-size: 0.875rem;
+      color: #5d4037;
+    }
+    .deploy-fail {
+      background: #ffebee !important;
+      border-color: #ef5350 !important;
+      color: #b71c1c !important;
+    }
+  </style>
+</head>
+<body>
+
+<div style="max-width:760px;margin:0 auto">
+  <h1>ArsifyOS</h1>
+  <p class="subtitle">Brief → PRD + SDD + API Spec, consistency-validated</p>
+
+  <!-- Config card -->
+  <div class="card">
+    <div class="config-row">
+      <div>
+        <label for="api-base">API base URL</label>
+        <input type="text" id="api-base" value="http://localhost:8001" placeholder="http://localhost:8001">
+      </div>
+      <div>
+        <label for="api-key">X-Api-Key (if using api_hub)</label>
+        <input type="password" id="api-key" placeholder="Leave blank for direct access">
+      </div>
+    </div>
+  </div>
+
+  <!-- Brief input card -->
+  <div class="card">
+    <label for="brief">Product brief</label>
+    <textarea id="brief" placeholder="Describe your product idea in detail. Minimum 50 characters. Example: A task management app for remote teams where each workspace has projects, tasks, and members with role-based access control..."></textarea>
+    <div class="hint" id="char-hint">0 / 2000 characters (minimum 50)</div>
+    <button id="run-btn" onclick="runPipeline()">Generate documents</button>
+
+    <div id="status-bar">
+      <span id="status-text"></span>
+      <div class="steps" id="steps-row">
+        <span class="step" id="step-1">1/4 PRD</span>
+        <span class="step" id="step-2">2/4 SDD</span>
+        <span class="step" id="step-3">3/4 API Spec</span>
+        <span class="step" id="step-4">4/4 Consistency</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Output tabs -->
+  <div class="tabs card" id="output-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
+      <strong>Output</strong>
+      <span id="score-display"></span>
+    </div>
+    <div class="tab-bar" style="margin-top:0.75rem">
+      <button class="tab-btn active" onclick="showTab('prd', this)">PRD</button>
+      <button class="tab-btn" onclick="showTab('sdd', this)">SDD</button>
+      <button class="tab-btn" onclick="showTab('api', this)">API Spec</button>
+      <button class="tab-btn" onclick="showTab('conflicts', this)">Conflicts</button>
+    </div>
+    <div class="tab-content active" id="tab-prd">
+      <button class="copy-btn" onclick="copyTab('prd-pre')">Copy</button>
+      <pre id="prd-pre"></pre>
+    </div>
+    <div class="tab-content" id="tab-sdd">
+      <button class="copy-btn" onclick="copyTab('sdd-pre')">Copy</button>
+      <pre id="sdd-pre"></pre>
+    </div>
+    <div class="tab-content" id="tab-api">
+      <button class="copy-btn" onclick="copyTab('api-pre')">Copy</button>
+      <pre id="api-pre"></pre>
+    </div>
+    <div class="tab-content" id="tab-conflicts">
+      <pre id="conflicts-pre"></pre>
+    </div>
+  </div>
+
+  <!-- ── Compiler: Generate App ─────────────────────────────────────────── -->
+  <div id="compiler-card">
+    <h2>⚡ Generate Runnable App</h2>
+    <p>Compile documents into a full FastAPI project you can run locally.</p>
+    <button id="generate-btn" onclick="generateApp()">Generate App</button>
+    <div id="compiler-status">🔨 Generating project code via AI compiler…</div>
+    <div id="download-banner">
+      ✅ <strong>Project ready!</strong>
+      <a id="download-link" href="#" download>📦 Download project.zip</a>
+      <div class="dl-meta">Unzip → run <code>./run.sh</code> → open http://localhost:8000</div>
+    </div>
+  </div>
+
+  <!-- ── Phase C: Live deployment banner ────────────────────────────────── -->
+  <div id="deploy-status">⏳ <span id="deploy-status-text">Preparing auto-deploy...</span></div>
+
+  <div id="live-card">
+    <h2>🚀 Your App is Live</h2>
+    <p style="color:#2e5e2e">The pipeline finished, the project compiled, and the server is running.</p>
+    <a id="live-link" class="live-url" href="#" target="_blank" rel="noopener">Open App ↗</a>
+    <div class="live-meta">
+      <div>URL: <span id="live-url-text"></span></div>
+      <div>PID: <span id="live-pid"></span> · Port: <span id="live-port"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let pollTimer = null;
+  let currentSessionId = null;
+
+  const STEP_STATUS_MAP = {
+    "queued":                  [0, "Queued..."],
+    "generating_prd":          [1, "Generating PRD..."],
+    "generating_sdd":          [2, "Generating SDD..."],
+    "generating_api_spec":     [3, "Generating API Spec..."],
+    "validating_consistency":  [4, "Validating consistency..."],
+    "complete":                [4, "Documents complete"],
+    "failed":                  [0, "Failed"],
+  };
+
+  // ── Character counter ────────────────────────────────────────────────────
+  document.getElementById("brief").addEventListener("input", function() {
+    const len = this.value.length;
+    const hint = document.getElementById("char-hint");
+    hint.textContent = `${len} / 2000 characters (minimum 50)`;
+    hint.style.color = len < 50 ? "#a32d2d" : "#888780";
+  });
+
+  // ── Main: run pipeline ───────────────────────────────────────────────────
+  async function runPipeline() {
+    const brief  = document.getElementById("brief").value.trim();
+    const apiBase = document.getElementById("api-base").value.trim().replace(/\/$/, "");
+    const apiKey  = document.getElementById("api-key").value.trim();
+
+    if (brief.length < 50) {
+      alert("Brief must be at least 50 characters.");
+      return;
+    }
+
+    setRunning(true);
+    resetOutput();
+    stopPolling();
+
+    const headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-Api-Key"] = apiKey;
+
+    try {
+      const res = await fetch(`${apiBase}/pipeline/run`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ brief }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        showError(err.detail || JSON.stringify(err));
+        setRunning(false);
+        return;
+      }
+
+      const data = await res.json();
+      currentSessionId = data.session_id;
+      showStatus("running", `Session: ${currentSessionId}`);
+      pollStatus(apiBase, apiKey, currentSessionId);
+
+    } catch (err) {
+      showError(`Connection error: ${err.message}`);
+      setRunning(false);
+    }
+  }
+
+  // ── Polling ──────────────────────────────────────────────────────────────
+  function pollStatus(apiBase, apiKey, sessionId) {
+    const headers = {};
+    if (apiKey) headers["X-Api-Key"] = apiKey;
+
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiBase}/pipeline/status/${sessionId}`, { headers });
+        if (!res.ok) return;
+        const state = await res.json();
+        updateSteps(state.status);
+
+        if (state.status === "complete") {
+          // Pipeline done — fetch documents (idempotent), then keep polling
+          // for deploy_status updates (auto-compile + auto-deploy run as
+          // background chain in the same session).
+          await fetchOutput(apiBase, apiKey, sessionId);
+          setRunning(false);
+          handleAutoDeployUpdate(state);
+          if (state.deploy_status === "live" || state.deploy_status === "failed" || state.deploy_status === "skipped") {
+            stopPolling();
+          }
+        } else if (state.status === "failed") {
+          stopPolling();
+          showError(`Pipeline failed: ${state.error || "Unknown error"}`);
+          setRunning(false);
+        }
+      } catch (_) { /* network hiccup, keep polling */ }
+    }, 5000); // PRD §5: poll every 5 seconds
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // ── Fetch output ─────────────────────────────────────────────────────────
+  async function fetchOutput(apiBase, apiKey, sessionId) {
+    const headers = {};
+    if (apiKey) headers["X-Api-Key"] = apiKey;
+
+    const res = await fetch(`${apiBase}/pipeline/output/${sessionId}`, { headers });
+    if (!res.ok) {
+      showError("Failed to retrieve output. Try refreshing.");
+      return;
+    }
+
+    const bundle = await res.json();
+    renderOutput(bundle);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function renderOutput(bundle) {
+    document.getElementById("prd-pre").textContent      = bundle.outputs?.prd      || "(empty)";
+    document.getElementById("sdd-pre").textContent      = bundle.outputs?.sdd      || "(empty)";
+    document.getElementById("api-pre").textContent      = bundle.outputs?.api_spec || "(empty)";
+    document.getElementById("conflicts-pre").textContent =
+      bundle.consistency_result
+        ? JSON.stringify(bundle.consistency_result, null, 2)
+        : "No consistency result available.";
+
+    const score = bundle.consistency_score;
+    if (score !== null && score !== undefined) {
+      const cls  = score >= 90 ? "score-high" : score >= 70 ? "score-medium" : "score-low";
+      document.getElementById("score-display").innerHTML =
+        `Consistency score: <span class="score-badge ${cls}">${score}/100</span>`;
+    }
+
+    document.getElementById("output-card").style.display = "block";
+    document.getElementById("compiler-card").style.display = "block";
+    showStatus("complete", `Done — session ${bundle.session_id}`);
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────
+  function updateSteps(status) {
+    const [activeStep] = STEP_STATUS_MAP[status] || [0, status];
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`step-${i}`);
+      el.className = i < activeStep ? "step done" : i === activeStep ? "step active" : "step";
+    }
+    const [, label] = STEP_STATUS_MAP[status] || [0, status];
+    document.getElementById("status-text").textContent = label;
+  }
+
+  function setRunning(running) {
+    document.getElementById("run-btn").disabled = running;
+  }
+
+  function showStatus(type, msg) {
+    const bar = document.getElementById("status-bar");
+    bar.className = `status-bar ${type}`;
+    bar.style.display = "block";
+    document.getElementById("status-text").textContent = msg;
+  }
+
+  function showError(msg) {
+    showStatus("error", `Error: ${msg}`);
+    document.getElementById("steps-row").style.display = "none";
+  }
+
+  function resetOutput() {
+    document.getElementById("output-card").style.display = "none";
+    document.getElementById("compiler-card").style.display = "none";
+    document.getElementById("download-banner").style.display = "none";
+    document.getElementById("live-card").style.display = "none";
+    document.getElementById("deploy-status").style.display = "none";
+    document.getElementById("score-display").innerHTML = "";
+    document.getElementById("steps-row").style.display = "flex";
+    updateSteps("queued");
+  }
+
+  function showTab(name, btn) {
+    document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+    document.getElementById(`tab-${name}`).classList.add("active");
+    btn.classList.add("active");
+  }
+
+  function copyTab(preId) {
+    navigator.clipboard.writeText(document.getElementById(preId).textContent)
+      .then(() => alert("Copied to clipboard."))
+      .catch(() => alert("Copy failed. Select and copy manually."));
+  }
+
+
+  // ── Phase C: handle auto-deploy status from /pipeline/status payload ────
+  function handleAutoDeployUpdate(state) {
+    const ds = state.deploy_status;
+    const cs = state.compile_status;
+    const banner = document.getElementById("deploy-status");
+    const txt    = document.getElementById("deploy-status-text");
+
+    if (!ds && !cs) {
+      banner.style.display = "none";
+      return;
+    }
+
+    banner.classList.remove("deploy-fail");
+
+    if (cs === "running") {
+      banner.style.display = "block";
+      txt.textContent = "🔨 Auto-compiling project...";
+      return;
+    }
+    if (cs === "failed") {
+      banner.style.display = "block";
+      banner.classList.add("deploy-fail");
+      txt.textContent = "❌ Auto-compile failed: " + (state.compile_error || "unknown error") + ". Use the manual Generate App button below.";
+      return;
+    }
+    if (cs === "skipped" || ds === "skipped") {
+      banner.style.display = "block";
+      txt.textContent = "⚠️ Auto-deploy skipped — consistency score below 80. Use Generate App below.";
+      return;
+    }
+    if (ds === "running") {
+      banner.style.display = "block";
+      txt.textContent = "🚀 Auto-deploying — installing dependencies and starting server...";
+      return;
+    }
+    if (ds === "failed") {
+      banner.style.display = "block";
+      banner.classList.add("deploy-fail");
+      txt.textContent = "❌ Auto-deploy failed: " + (state.deploy_error || "unknown error");
+      return;
+    }
+    if (ds === "live") {
+      banner.style.display = "none";
+      const url  = state.deploy_url;
+      const port = state.deploy_port;
+      const pid  = state.deploy_pid;
+      const card = document.getElementById("live-card");
+      document.getElementById("live-link").href      = url;
+      document.getElementById("live-url-text").textContent = url;
+      document.getElementById("live-port").textContent     = port;
+      document.getElementById("live-pid").textContent      = pid;
+      card.style.display = "block";
+      // Hide manual compile UI — already auto-deployed
+      document.getElementById("compiler-card").style.display = "none";
+    }
+  }
+
+  // ── Generate App (Compiler layer) ────────────────────────────────────────
+  async function generateApp() {
+    if (!currentSessionId) {
+      alert("Run the pipeline first to generate documents.");
+      return;
+    }
+    const apiBase = document.getElementById("api-base").value.trim().replace(/\/$/, "");
+    const apiKey  = document.getElementById("api-key").value.trim();
+    const headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-Api-Key"] = apiKey;
+
+    const btn = document.getElementById("generate-btn");
+    btn.disabled = true;
+    document.getElementById("compiler-status").style.display = "block";
+    document.getElementById("download-banner").style.display = "none";
+
+    try {
+      const res = await fetch(`${apiBase}/compile`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ session_id: currentSessionId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Compile error: " + (err.detail?.message || err.detail || JSON.stringify(err)));
+        return;
+      }
+
+      const data = await res.json();
+      if (data.status === "success") {
+        const link = document.getElementById("download-link");
+        link.href = `${apiBase}${data.download}`;
+        document.getElementById("download-banner").style.display = "block";
+      }
+    } catch (err) {
+      alert("Connection error: " + err.message);
+    } finally {
+      btn.disabled = false;
+      document.getElementById("compiler-status").style.display = "none";
+    }
+  }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# ── ArsifyOS — LiteLLM gateway config (local dev) ────────────────────────────
+# Routes upshalter/smart to OpenRouter.
+# Redis cache is disabled for local dev simplicity.
+
+model_list:
+  - model_name: upshalter/smart
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4-6
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: upshalter/smart
+    litellm_params:
+      model: openrouter/openai/gpt-4o
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+router_settings:
+  routing_strategy: latency-based-routing
+  num_retries: 3
+  retry_after: 5
+
+litellm_settings:
+  cache: false          # Disabled for local dev (no Redis needed)
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

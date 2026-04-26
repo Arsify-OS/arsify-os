@@ -1,0 +1,85 @@
+version: "3.9"
+
+# ── ArsifyOS — one-command local dev ─────────────────────────────────────────
+# Services: pipeline_engine (8001) · or_gateway/LiteLLM (4000) · frontend (3000)
+# Run: ./run.sh
+# Open: http://localhost:3000
+
+services:
+
+  # ── LLM Gateway (LiteLLM → OpenRouter) ───────────────────────────────────
+  or_gateway:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: arsify_gateway
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+    volumes:
+      - ./infra/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    networks:
+      - arsify_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+  # ── Pipeline Engine (Marshal + Agents) ───────────────────────────────────
+  pipeline_engine:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: arsify_pipeline
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+      # Phase C: expose deployed-app port range to host
+      - "9000-9099:9000-9099"
+    environment:
+      DEPLOY_PUBLIC_HOST: "localhost"
+      DEPLOY_PORT_MIN: "9000"
+      DEPLOY_PORT_MAX: "9099"
+      PIPELINE_LLM_GATEWAY: "http://or_gateway:4000"
+      PIPELINE_STORAGE_PATH: "/pipeline_outputs"
+      PIPELINE_MAX_RETRIES: "${PIPELINE_MAX_RETRIES:-2}"
+      PIPELINE_TIMEOUT_SECONDS: "${PIPELINE_TIMEOUT_SECONDS:-180}"
+    volumes:
+      - pipeline_outputs:/pipeline_outputs
+    networks:
+      - arsify_net
+    depends_on:
+      or_gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Frontend (nginx static) ───────────────────────────────────────────────
+  frontend:
+    image: nginx:alpine
+    container_name: arsify_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    networks:
+      - arsify_net
+    depends_on:
+      - pipeline_engine
+
+volumes:
+  pipeline_outputs:
+    driver: local
+
+networks:
+  arsify_net:
+    driver: bridge
